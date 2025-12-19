@@ -1,2 +1,0 @@
-# Uhr
-EInfach ne Uhr
