@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gradient + Uhr (einstellbar)</title>
+  <style>
+    :root{
+      --g1:#f39c12;   /* oben */
+      --g2:#b86b24;   /* mitte */
+      --g3:#2b2d6b;   /* unten */
+      --angle:180deg; /* Richtung */
+      --midStop:60%;  /* Position der mittleren Farbe */
+    }
+
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    body{
+      margin:0; min-height:100vh; display:grid; place-items:center;
+      background: linear-gradient(var(--angle), var(--g1) 0%, var(--g2) var(--midStop), var(--g3) 100%);
+      overflow:hidden;
+    }
+
+    .clockCard{
+      color:#fff;
+      padding:28px 44px;
+      border-radius:14px;
+      background: rgba(255,255,255,.14);
+      box-shadow: 0 14px 40px rgba(0,0,0,.25);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      text-align:center;
+      user-select:none;
+    }
+    .time{
+      font-size:64px;
+      font-weight:700;
+      letter-spacing:1px;
+      line-height:1;
+    }
+    .date{
+      margin-top:10px;
+      font-size:14px;
+      opacity:.9;
+    }
+
+    /* Settings UI */
+    .settingsBtn{
+      position:fixed; right:18px; top:18px;
+      border:0; border-radius:12px;
+      padding:10px 12px;
+      background: rgba(255,255,255,.16);
+      color:#fff;
+      backdrop-filter: blur(10px);
+      cursor:pointer;
+    }
+    .panel{
+      position:fixed; right:18px; top:64px;
+      width:min(320px, calc(100vw - 36px));
+      padding:14px;
+      border-radius:14px;
+      background: rgba(0,0,0,.35);
+      color:#fff;
+      box-shadow: 0 14px 40px rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+      display:none;
+    }
+    .panel.open{display:block;}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0;}
+    .row label{font-size:13px; opacity:.95;}
+    .row input[type="color"]{width:56px;height:34px;border:0;background:transparent;padding:0;cursor:pointer}
+    .row input[type="range"]{width:160px}
+    .small{font-size:12px; opacity:.85}
+    .btnRow{display:flex; gap:10px; margin-top:12px}
+    .btn{
+      flex:1; border:0; border-radius:12px; padding:10px 12px;
+      background: rgba(255,255,255,.16);
+      color:#fff; cursor:pointer;
+    }
+    .btn:active{transform:translateY(1px)}
+    code{
+      display:block; margin-top:10px; padding:10px;
+      background: rgba(0,0,0,.35);
+      border-radius:12px; font-size:12px; overflow:auto;
+    }
+  </style>
+</head>
+<body>
+  <button class="settingsBtn" id="toggle">⚙️</button>
+
+  <div class="panel" id="panel">
+    <div class="row">
+      <label>Farbe oben</label>
+      <input type="color" id="c1" />
+    </div>
+    <div class="row">
+      <label>Farbe Mitte</label>
+      <input type="color" id="c2" />
+    </div>
+    <div class="row">
+      <label>Farbe unten</label>
+      <input type="color" id="c3" />
+    </div>
+
+    <div class="row">
+      <label>Richtung <span class="small" id="angleLabel"></span></label>
+      <input type="range" id="angle" min="0" max="360" step="1" />
+    </div>
+
+    <div class="row">
+      <label>Mid-Stop <span class="small" id="stopLabel"></span></label>
+      <input type="range" id="midStop" min="10" max="90" step="1" />
+    </div>
+
+    <div class="btnRow">
+      <button class="btn" id="copyCss">CSS kopieren</button>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+
+    <code id="cssOut"></code>
+  </div>
+
+  <div class="clockCard">
+    <div class="time" id="time">--:--:--</div>
+    <div class="date" id="date">---</div>
+  </div>
+
+  <script>
+    // ===== Uhr =====
+    const timeEl = document.getElementById("time");
+    const dateEl = document.getElementById("date");
+
+    function tick(){
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,"0");
+      const mm = String(now.getMinutes()).padStart(2,"0");
+      const ss = String(now.getSeconds()).padStart(2,"0");
+      timeEl.textContent = `${hh}:${mm}:${ss}`;
+
+      const dateFmt = new Intl.DateTimeFormat("de-DE", { weekday:"long", day:"2-digit", month:"long", year:"numeric" });
+      // "Freitag, 19. Dezember 2025" wie im Screenshot
+      const raw = dateFmt.format(now);
+      dateEl.textContent = raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+    tick();
+    setInterval(tick, 1000);
+
+    // ===== Gradient Settings =====
+    const root = document.documentElement;
+    const panel = document.getElementById("panel");
+    const toggle = document.getElementById("toggle");
+
+    const c1 = document.getElementById("c1");
+    const c2 = document.getElementById("c2");
+    const c3 = document.getElementById("c3");
+    const angle = document.getElementById("angle");
+    const midStop = document.getElementById("midStop");
+
+    const angleLabel = document.getElementById("angleLabel");
+    const stopLabel  = document.getElementById("stopLabel");
+    const cssOut     = document.getElementById("cssOut");
+
+    const LS_KEY = "gradientSettings_v1";
+    const defaults = { g1:"#f39c12", g2:"#b86b24", g3:"#2b2d6b", angle:180, midStop:60 };
+
+    function load(){
+      try{
+        const saved = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+        return saved ? { ...defaults, ...saved } : { ...defaults };
+      }catch{
+        return { ...defaults };
+      }
+    }
+
+    function save(state){
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    }
+
+    function apply(state){
+      root.style.setProperty("--g1", state.g1);
+      root.style.setProperty("--g2", state.g2);
+      root.style.setProperty("--g3", state.g3);
+      root.style.setProperty("--angle", `${state.angle}deg`);
+      root.style.setProperty("--midStop", `${state.midStop}%`);
+
+      c1.value = state.g1;
+      c2.value = state.g2;
+      c3.value = state.g3;
+      angle.value = state.angle;
+      midStop.value = state.midStop;
+
+      angleLabel.textContent = `${state.angle}°`;
+      stopLabel.textContent  = `${state.midStop}%`;
+
+      const css = `background: linear-gradient(${state.angle}deg, ${state.g1} 0%, ${state.g2} ${state.midStop}%, ${state.g3} 100%);`;
+      cssOut.textContent = css;
+    }
+
+    let state = load();
+    apply(state);
+
+    function update(){
+      state = {
+        g1: c1.value,
+        g2: c2.value,
+        g3: c3.value,
+        angle: Number(angle.value),
+        midStop: Number(midStop.value)
+      };
+      apply(state);
+      save(state);
+    }
+
+    [c1,c2,c3,angle,midStop].forEach(el => el.addEventListener("input", update));
+
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("open");
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      state = { ...defaults };
+      apply(state);
+      save(state);
+    });
+
+    document.getElementById("copyCss").addEventListener("click", async () => {
+      try{
+        await navigator.clipboard.writeText(cssOut.textContent);
+        toggle.textContent = "✅";
+        setTimeout(()=> toggle.textContent="⚙️", 700);
+      }catch{
+        // falls Clipboard blockt
+        alert("Kopieren ging nicht (Browser blockt Clipboard).");
+      }
+    });
+  </script>
+</body>
+</html>
